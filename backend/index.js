@@ -61,57 +61,6 @@ app.post('/api/generate', async (req, res) => {
   `;
 
   try {
-    // Mock response for development to avoid API calls
-    const mockResponse = {
-      city: city,
-      itinerary: [
-        {
-          day: 1,
-          activities: [
-            {
-              place: 'Eiffel Tower',
-              type: 'attraction',
-              description: 'Iconic landmark of Paris.',
-              cost: 25,
-              lat: 48.8584,
-              lng: 2.2945,
-            },
-            {
-              place: 'Louvre Museum',
-              type: 'museum',
-              description: 'Home to the Mona Lisa.',
-              cost: 17,
-              lat: 48.8606,
-              lng: 2.3376,
-            },
-            {
-              place: 'Le Procope',
-              type: 'restaurant',
-              description: 'One of the oldest restaurants in Paris.',
-              cost: 80,
-              lat: 48.8531,
-              lng: 2.3389,
-            },
-          ],
-          transport: [
-            { from: 'Eiffel Tower', to: 'Louvre Museum', mode: 'taxi' },
-            { from: 'Louvre Museum', to: 'Le Procope', mode: 'walk' },
-          ],
-          hotel: {
-            name: 'Hotel Lutetia',
-            price: 400,
-            lat: 48.8517,
-            lng: 2.3269,
-          },
-        },
-      ],
-      summary: { totalCost: 522 },
-    };
-
-    res.json(mockResponse);
-
-    /*
-    // Uncomment this section to use the actual OpenAI API
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo', // Or 'gpt-4'
       messages: [{ role: 'user', content: prompt }],
@@ -120,7 +69,6 @@ app.post('/api/generate', async (req, res) => {
 
     const itineraryJson = JSON.parse(response.choices[0].message.content);
     res.json(itineraryJson);
-    */
   } catch (error) {
     console.error('Error generating itinerary:', error);
     res.status(500).json({ error: 'Failed to generate itinerary.' });
@@ -191,7 +139,6 @@ app.post('/api/export/pdf', (req, res) => {
     });
     doc.addPage();
   });
-  // --- End PDF Content ---
 
   doc.end();
 
