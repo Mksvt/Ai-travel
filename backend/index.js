@@ -61,6 +61,85 @@ app.post('/api/generate', async (req, res) => {
   `;
 
   try {
+    // Mock response for development to avoid API calls
+    const mockResponse = {
+      city: city,
+      itinerary: [
+        {
+          day: 1,
+          activities: [
+            {
+              place: 'Eiffel Tower',
+              type: 'attraction',
+              description: 'Iconic landmark of Paris.',
+              cost: 25,
+              lat: 48.8584,
+              lng: 2.2945,
+            },
+            {
+              place: 'Louvre Museum',
+              type: 'museum',
+              description: 'Home to the Mona Lisa.',
+              cost: 17,
+              lat: 48.8606,
+              lng: 2.3376,
+            },
+          ],
+          transport: [
+            { from: 'Eiffel Tower', to: 'Louvre Museum', mode: 'taxi' },
+          ],
+          hotel: {
+            name: 'Hotel Lutetia',
+            price: 400,
+            lat: 48.8517,
+            lng: 2.3269,
+          },
+        },
+        {
+          day: 2,
+          activities: [
+            {
+              place: 'Cathédrale Notre-Dame de Paris',
+              type: 'attraction',
+              description: 'Famous medieval Catholic cathedral.',
+              cost: 0,
+              lat: 48.853,
+              lng: 2.3499,
+            },
+          ],
+          transport: [],
+          hotel: {
+            name: 'Hotel Lutetia',
+            price: 400,
+            lat: 48.8517,
+            lng: 2.3269,
+          },
+        },
+      ],
+      summary: { totalCost: 842 },
+    };
+
+    // Add a surprise activity if requested
+    if (preferences.toLowerCase().includes('surprise')) {
+      const surpriseActivity = {
+        place: 'Shakespeare and Company',
+        type: 'attraction',
+        description:
+          'A famous independent bookstore with a rich history, opposite Notre-Dame.',
+        cost: 0,
+        lat: 48.8525,
+        lng: 2.3473,
+      };
+      const randomDayIndex = Math.floor(
+        Math.random() * mockResponse.itinerary.length
+      );
+      mockResponse.itinerary[randomDayIndex].activities.push(surpriseActivity);
+    }
+
+    res.json(mockResponse);
+
+    /*
+    // Uncomment this section to use the actual OpenAI API
     const response = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo', // Or 'gpt-4'
       messages: [{ role: 'user', content: prompt }],
@@ -69,6 +148,7 @@ app.post('/api/generate', async (req, res) => {
 
     const itineraryJson = JSON.parse(response.choices[0].message.content);
     res.json(itineraryJson);
+    */
   } catch (error) {
     console.error('Error generating itinerary:', error);
     res.status(500).json({ error: 'Failed to generate itinerary.' });

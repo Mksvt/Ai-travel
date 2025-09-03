@@ -13,6 +13,7 @@ export interface Itinerary {
 }
 
 export interface DayPlan {
+  id: string; // Unique ID for the day
   day: number;
   activities: Activity[];
   transport: Transport[];
@@ -20,6 +21,7 @@ export interface DayPlan {
 }
 
 export interface Activity {
+  id: string; // Unique ID for the activity
   place: string;
   type: 'museum' | 'restaurant' | 'park' | 'attraction';
   description: string;
@@ -35,6 +37,7 @@ export interface Transport {
 }
 
 export interface Hotel {
+  id: string; // Unique ID for the hotel
   name: string;
   price: number;
   lat: number;
