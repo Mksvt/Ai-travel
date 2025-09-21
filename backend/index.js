@@ -3,13 +3,21 @@ const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
 const PDFDocument = require('pdfkit');
-const fs = require('fs');
+const fs = require('fs').promises;
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3001;
 
+if (!process.env.OPENAI_API_KEY) {
+  console.error(
+    'Error: OPENAI_API_KEY is not set in the environment variables.'
+  );
+  process.exit(1);
+}
+
 const openai = new OpenAI({
-   apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 app.use(cors());
@@ -20,11 +28,67 @@ app.get('/', (req, res) => {
   res.send('AI Travel Planner Backend is running!');
 });
 
-/**
- * API to generate a travel itinerary.
- * POST /api/generate
- * Body: { city: string, budget: number, days: number, preferences: string }
- */
+const generatePDF = async (itinerary, city, summary) => {
+  const doc = new PDFDocument({ margin: 50 });
+  const fileName = `travel-guide-${city
+    .toLowerCase()
+    .replace(/\s/g, '-')}-${Date.now()}.pdf`;
+  const filePath = path.join('exports', fileName);
+
+  // Ensure the exports directory exists
+  await fs.mkdir('exports', { recursive: true });
+
+  return new Promise((resolve, reject) => {
+    const stream = fs.createWriteStream(filePath);
+    doc.pipe(stream);
+
+    // --- PDF Content ---
+    doc
+      .fontSize(24)
+      .font('Helvetica-Bold')
+      .text(`Your Travel Guide to ${city}`, { align: 'center' });
+    doc.moveDown();
+
+    doc
+      .fontSize(16)
+      .font('Helvetica-Bold')
+      .text(`Total Estimated Cost: $${summary.totalCost}`);
+    doc.moveDown(2);
+
+    itinerary.forEach((day) => {
+      doc.fontSize(18).font('Helvetica-Bold').text(`Day ${day.day}`);
+      doc.moveDown();
+
+      if (day.hotel) {
+        doc.fontSize(14).font('Helvetica-Bold').text('Hotel:');
+        doc.font('Helvetica').text(`${day.hotel.name} - $${day.hotel.price}`);
+        doc.moveDown();
+      }
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Activities:');
+      day.activities.forEach((activity) => {
+        doc.font('Helvetica-Bold').text(activity.place, { continued: true });
+        doc.font('Helvetica').text(` (${activity.type}) - $${activity.cost}`);
+        doc.fontSize(10).fillColor('gray').text(activity.description);
+        doc.moveDown(0.5);
+      });
+      doc.fillColor('black');
+      doc.moveDown();
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Transport:');
+      day.transport.forEach((leg) => {
+        doc.font('Helvetica').text(`${leg.from} → ${leg.to} (${leg.mode})`);
+      });
+      doc.addPage();
+    });
+
+    doc.end();
+
+    stream.on('finish', () => resolve(filePath));
+    stream.on('error', (err) => reject(err));
+  });
+};
+
 app.post('/api/generate', async (req, res) => {
   const { city, budget, days, preferences } = req.body;
 
@@ -61,98 +125,35 @@ app.post('/api/generate', async (req, res) => {
   `;
 
   try {
-    // Uncomment this section to use the actual OpenAI API
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo', // Or 'gpt-4'
+      model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
     });
 
     const itineraryJson = JSON.parse(response.choices[0].message.content);
     res.json(itineraryJson);
-
   } catch (error) {
     console.error('Error generating itinerary:', error);
     res.status(500).json({ error: 'Failed to generate itinerary.' });
   }
 });
 
-/**
- * API to export itinerary as PDF.
- * POST /api/export/pdf
- */
-app.post('/api/export/pdf', (req, res) => {
+app.post('/api/export/pdf', async (req, res) => {
   const { itinerary, city, summary } = req.body;
 
   if (!itinerary) {
     return res.status(400).json({ error: 'Itinerary data is required.' });
   }
 
-  const doc = new PDFDocument({ margin: 50 });
-  const fileName = `travel-guide-${city
-    .toLowerCase()
-    .replace(/\s/g, '-')}-${Date.now()}.pdf`;
-  const filePath = `exports/${fileName}`;
-
-  // Create exports directory if it doesn't exist
-  if (!fs.existsSync('exports')) {
-    fs.mkdirSync('exports');
-  }
-
-  const stream = fs.createWriteStream(filePath);
-  doc.pipe(stream);
-
-  // --- PDF Content ---
-  doc
-    .fontSize(24)
-    .font('Helvetica-Bold')
-    .text(`Your Travel Guide to ${city}`, { align: 'center' });
-  doc.moveDown();
-
-  doc
-    .fontSize(16)
-    .font('Helvetica-Bold')
-    .text(`Total Estimated Cost: $${summary.totalCost}`);
-  doc.moveDown(2);
-
-  itinerary.forEach((day) => {
-    doc.fontSize(18).font('Helvetica-Bold').text(`Day ${day.day}`);
-    doc.moveDown();
-
-    if (day.hotel) {
-      doc.fontSize(14).font('Helvetica-Bold').text('Hotel:');
-      doc.font('Helvetica').text(`${day.hotel.name} - $${day.hotel.price}`);
-      doc.moveDown();
-    }
-
-    doc.fontSize(14).font('Helvetica-Bold').text('Activities:');
-    day.activities.forEach((activity) => {
-      doc.font('Helvetica-Bold').text(activity.place, { continued: true });
-      doc.font('Helvetica').text(` (${activity.type}) - $${activity.cost}`);
-      doc.fontSize(10).fillColor('gray').text(activity.description);
-      doc.moveDown(0.5);
-    });
-    doc.fillColor('black');
-    doc.moveDown();
-
-    doc.fontSize(14).font('Helvetica-Bold').text('Transport:');
-    day.transport.forEach((leg) => {
-      doc.font('Helvetica').text(`${leg.from} → ${leg.to} (${leg.mode})`);
-    });
-    doc.addPage();
-  });
-
-  doc.end();
-
-  stream.on('finish', () => {
+  try {
+    const filePath = await generatePDF(itinerary, city, summary);
     const url = `${req.protocol}://${req.get('host')}/${filePath}`;
     res.json({ url });
-  });
-
-  stream.on('error', (err) => {
-    console.error('Error writing PDF:', err);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
     res.status(500).json({ error: 'Failed to generate PDF.' });
-  });
+  }
 });
 
 app.listen(port, () => {
